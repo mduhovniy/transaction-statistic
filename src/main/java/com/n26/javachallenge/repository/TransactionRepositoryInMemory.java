@@ -41,6 +41,6 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
 
     private List<Transaction> refreshTransactions(List<Transaction> transactions) {
         long now = System.currentTimeMillis();
-        return transactions.stream().filter(t -> t.getTimestamp() < (now - ONE_MINUTE)).collect(Collectors.toList());
+        return transactions.stream().filter(t -> t.getTimestamp() > (now - ONE_MINUTE)).collect(Collectors.toList());
     }
 }
