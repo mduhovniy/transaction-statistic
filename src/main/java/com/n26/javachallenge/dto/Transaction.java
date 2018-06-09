@@ -1,9 +1,9 @@
 package com.n26.javachallenge.dto;
 
-import lombok.Data;
 import lombok.NonNull;
+import lombok.Value;
 
-@Data
+@Value
 public class Transaction {
 
     @NonNull
