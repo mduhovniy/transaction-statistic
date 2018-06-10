@@ -18,7 +18,7 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     @PostMapping
-    public void putTransaction(@RequestBody Transaction transaction) {
-        transactionService.putTransaction(transaction);
+    public void postTransaction(@RequestBody Transaction transaction) {
+        transactionService.addTransaction(transaction);
     }
 }

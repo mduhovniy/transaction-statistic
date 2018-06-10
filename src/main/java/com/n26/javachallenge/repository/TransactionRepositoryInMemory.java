@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Component
@@ -37,6 +36,12 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
         double min = transactions.stream().min(Comparator.comparing(Transaction::getAmount)).map(Transaction::getAmount).orElse(0d);
         long count = transactions.size();
         return new Statistic(sum, avg, max, min, count);
+    }
+
+    @Override
+    public void clearStatistic() {
+        transactions = new ArrayList<>();
+        lastProjection = null;
     }
 
     private List<Transaction> refreshTransactions(List<Transaction> transactions) {
