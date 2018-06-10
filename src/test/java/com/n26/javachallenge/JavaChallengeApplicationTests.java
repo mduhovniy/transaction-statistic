@@ -36,13 +36,13 @@ public class JavaChallengeApplicationTests {
 
     @Test
     public void timestampSequentialTransactionLoading() throws InterruptedException {
-        //transactionProcessor.clearStatistic();
+        transactionProcessor.clearStatistic();
         transactionLoading(false);
     }
 
     @Test
     public void timestampDiscrepancyTransactionLoading() throws InterruptedException {
-        //transactionProcessor.clearStatistic();
+        transactionProcessor.clearStatistic();
         transactionLoading(true);
     }
 
