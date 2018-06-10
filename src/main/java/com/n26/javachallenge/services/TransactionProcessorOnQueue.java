@@ -74,12 +74,13 @@ public class TransactionProcessorOnQueue implements TransactionProcessor {
                     double max = 0;
                     double min = Double.MAX_VALUE;
                     long count = 0;
-                    if (repository.getLastProjection() != null) {
-                        sum = repository.getLastProjection().getSum();
-                        avg = repository.getLastProjection().getAvg();
-                        max = repository.getLastProjection().getMax();
-                        min = repository.getLastProjection().getMin();
-                        count = repository.getLastProjection().getCount();
+                    Statistic lastProjection = repository.getLastProjection();
+                    if (lastProjection != null) {
+                        sum = lastProjection.getSum();
+                        avg = lastProjection.getAvg();
+                        max = lastProjection.getMax();
+                        min = lastProjection.getMin();
+                        count = lastProjection.getCount();
                     }
                     while (transaction.isProcessed() && !transaction.isProcessingStopped()) {
                         if (transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE) {
