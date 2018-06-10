@@ -9,5 +9,5 @@ public interface TransactionRepository {
 
     void addTransaction(Transaction transaction);
 
-    void clearStatistic();
+    void clearStatistic() throws InterruptedException;
 }

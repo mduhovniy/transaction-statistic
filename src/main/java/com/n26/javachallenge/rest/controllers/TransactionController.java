@@ -21,9 +21,7 @@ public class TransactionController {
 
     @PostMapping
     public ResponseEntity postTransaction(@RequestBody Transaction transaction) {
-        if (transactionService.addTransaction(transaction)) {
-            return ResponseEntity.status(HttpStatus.CREATED).build();
-        }
+        if (transactionService.addTransaction(transaction)) return ResponseEntity.status(HttpStatus.CREATED).build();
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

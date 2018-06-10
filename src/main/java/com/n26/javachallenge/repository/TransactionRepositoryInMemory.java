@@ -2,83 +2,123 @@ package com.n26.javachallenge.repository;
 
 import com.n26.javachallenge.dto.Statistic;
 import com.n26.javachallenge.dto.Transaction;
+import com.n26.javachallenge.dto.TransactionForQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.TaskScheduler;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 
 @Slf4j
 @Component
+@EnableAsync
 public class TransactionRepositoryInMemory implements TransactionRepository {
 
     private static final long ONE_MINUTE = 60 * 1_000;
-    private static final long EVENTUAL_CONSISTENCY_WINDOW_MS = 1;
 
-    private final ReentrantLock lock = new ReentrantLock();
-    private final ScheduledFuture future;
+    private final TaskExecutor executor;
 
-    private List<Transaction> transactions = new ArrayList<>();
+    private final BlockingQueue<TransactionForQueue> transactions = new PriorityBlockingQueue<>();
     private Statistic lastProjection = null;
 
     @Autowired
-    public TransactionRepositoryInMemory(TaskScheduler scheduler) {
-        future = scheduler.scheduleAtFixedRate(new StatisticRecalculation(), EVENTUAL_CONSISTENCY_WINDOW_MS);
+    public TransactionRepositoryInMemory(TaskExecutor executor) {
+        this.executor = executor;
+    }
+
+    @PostConstruct
+    public void init() {
+        executor.execute(new StatisticRecalculation());
+        log.info("Statistic recalculation was started");
     }
 
     @PreDestroy
     public void destroy() {
-        boolean isCancelled = future.cancel(true);
-        log.info("Scheduler task isCancelled={}", isCancelled);
+        transactions.offer(new TransactionForQueue());
+        log.info("Statistic recalculation was stopped");
     }
 
     @Override
     public Statistic getStatisticForLastMinute() {
-        return lastProjection;
+        return lastProjection == null ? new Statistic(0, 0, 0, 0, 0) : lastProjection;
     }
 
     @Override
     public void addTransaction(Transaction transaction) {
-        transactions.add(transaction);
-    }
-
-    private Statistic recalculateStatistic() {
-        transactions = refreshTransactions(transactions);
-        double sum = transactions.stream().mapToDouble(Transaction::getAmount).sum();
-        double avg = transactions.stream().collect(Collectors.averagingDouble(Transaction::getAmount));
-        double max = transactions.stream().max(Comparator.comparing(Transaction::getAmount)).map(Transaction::getAmount).orElse(0d);
-        double min = transactions.stream().min(Comparator.comparing(Transaction::getAmount)).map(Transaction::getAmount).orElse(0d);
-        long count = transactions.size();
-        return new Statistic(sum, avg, max, min, count);
+        transactions.offer(new TransactionForQueue(transaction, false));
     }
 
     @Override
-    public void clearStatistic() {
+    public void clearStatistic() throws InterruptedException {
+        log.info("Statistic was cleared");
+        destroy();
+        Thread.sleep(1_000);
         transactions.clear();
-    }
-
-    private List<Transaction> refreshTransactions(List<Transaction> transactions) {
-        long now = System.currentTimeMillis();
-        return transactions.stream().filter(t -> t.getTimestamp() > (now - ONE_MINUTE)).collect(Collectors.toList());
+        lastProjection = null;
+        init();
     }
 
     private final class StatisticRecalculation implements Runnable {
 
         @Override
         public void run() {
-            if (lock.tryLock()) {
-                try {
-                    lastProjection = recalculateStatistic();
-                } finally {
-                    lock.unlock();
+            double prevMax = 0, prevMin = Double.MAX_VALUE;
+            BlockingQueue<TransactionForQueue> processedTransactionBuffer = new PriorityBlockingQueue<>();
+            try {
+                TransactionForQueue transaction = transactions.take();
+                while (!transaction.isProcessingStopped()) {
+                    double sum = 0;
+                    double avg = 0;
+                    double max = 0;
+                    double min = Double.MAX_VALUE;
+                    long count = 0;
+                    if (lastProjection != null) {
+                        sum = lastProjection.getSum();
+                        avg = lastProjection.getAvg();
+                        max = lastProjection.getMax();
+                        min = lastProjection.getMin();
+                        count = lastProjection.getCount();
+                    }
+                    while (transaction.isProcessed() && !transaction.isProcessingStopped()) {
+                        if (transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE) {
+                            processedTransactionBuffer.put(transaction);
+                        } else {
+                            sum -= transaction.getAmount();
+                            max = transaction.getAmount() == max ? prevMax : max;
+                            min = transaction.getAmount() == min ? prevMin : min;
+                            count--;
+                            avg = sum / count;
+                        }
+                        transaction = transactions.take();
+                    }
+                    if (transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE) {
+                        sum += transaction.getAmount();
+                        if (transaction.getAmount() > max) {
+                            prevMax = max;
+                            max = transaction.getAmount();
+                        }
+                        if (transaction.getAmount() < min) {
+                            prevMin = min;
+                            min = transaction.getAmount();
+                        }
+                        count++;
+                        avg = sum / count;
+                        transactions.put(new TransactionForQueue(transaction.getTransaction(), true));
+                    }
+                    while (!processedTransactionBuffer.isEmpty()) {
+                        transactions.put(processedTransactionBuffer.take());
+                    }
+                    lastProjection = new Statistic(sum, avg, max, min, count);
+                    if (!transaction.isProcessingStopped())
+                        transaction = transactions.take();
                 }
+            } catch (InterruptedException e) {
+                log.info("StatisticRecalculation was interrupted");
             }
         }
     }
