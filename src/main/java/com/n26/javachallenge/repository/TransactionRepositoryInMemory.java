@@ -14,13 +14,6 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
 
     private static final long ONE_MINUTE = 60 * 1_000;
     private List<Transaction> transactions = new ArrayList<>();
-    private Statistic lastProjection;
-
-    @Override
-    public synchronized Statistic getStatisticForLastMinute() {
-        lastProjection = recalculateStatistic();
-        return lastProjection;
-    }
 
     @Override
     public void addTransaction(Transaction transaction) {
@@ -28,7 +21,7 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
     }
 
     @Override
-    public synchronized Statistic recalculateStatistic() {
+    public synchronized Statistic getStatisticForLastMinute() {
         transactions = refreshTransactions(transactions);
         double sum = transactions.stream().mapToDouble(Transaction::getAmount).sum();
         double avg = transactions.stream().collect(Collectors.averagingDouble(Transaction::getAmount));
@@ -41,7 +34,6 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
     @Override
     public void clearStatistic() {
         transactions = new ArrayList<>();
-        lastProjection = null;
     }
 
     private List<Transaction> refreshTransactions(List<Transaction> transactions) {

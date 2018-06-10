@@ -9,7 +9,5 @@ public interface TransactionRepository {
 
     void addTransaction(Transaction transaction);
 
-    Statistic recalculateStatistic();
-
     void clearStatistic();
 }
