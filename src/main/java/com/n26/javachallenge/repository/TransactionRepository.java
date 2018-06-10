@@ -8,6 +8,4 @@ public interface TransactionRepository {
     Statistic getStatisticForLastMinute();
 
     void addTransaction(Transaction transaction);
-
-    void clearStatistic() throws InterruptedException;
 }

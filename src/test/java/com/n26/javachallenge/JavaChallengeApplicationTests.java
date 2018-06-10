@@ -2,7 +2,7 @@ package com.n26.javachallenge;
 
 import com.n26.javachallenge.dto.Statistic;
 import com.n26.javachallenge.dto.Transaction;
-import com.n26.javachallenge.repository.TransactionRepository;
+import com.n26.javachallenge.services.TransactionProcessor;
 import io.restassured.http.ContentType;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
@@ -29,20 +29,20 @@ public class JavaChallengeApplicationTests {
     private int port;
 
     @Autowired
-    private TransactionRepository transactionRepository;
+    private TransactionProcessor transactionProcessor;
 
     private static final int TRANSACTION_MAX_COUNT = 1000;
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
 
     @Test
     public void timestampSequentialTransactionLoading() throws InterruptedException {
-        transactionRepository.clearStatistic();
+        //transactionProcessor.clearStatistic();
         transactionLoading(false);
     }
 
     @Test
     public void timestampDiscrepancyTransactionLoading() throws InterruptedException {
-        transactionRepository.clearStatistic();
+        //transactionProcessor.clearStatistic();
         transactionLoading(true);
     }
 
