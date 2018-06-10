@@ -4,5 +4,5 @@ import com.n26.javachallenge.dto.Transaction;
 
 public interface TransactionService {
 
-    void addTransaction(Transaction transaction);
+    boolean addTransaction(Transaction transaction);
 }

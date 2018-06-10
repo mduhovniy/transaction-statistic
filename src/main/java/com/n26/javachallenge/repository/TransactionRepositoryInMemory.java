@@ -16,7 +16,7 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
     private List<Transaction> transactions = new ArrayList<>();
 
     @Override
-    public void addTransaction(Transaction transaction) {
+    public synchronized void addTransaction(Transaction transaction) {
         transactions.add(transaction);
     }
 
