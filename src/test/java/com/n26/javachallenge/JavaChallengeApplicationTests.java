@@ -31,17 +31,8 @@ public class JavaChallengeApplicationTests {
     @Autowired
     private TransactionRepository transactionRepository;
 
-    private static final DecimalFormat DF4;
-    private static final DecimalFormat DF2;
-
-    static {
-        DF2 = new DecimalFormat("0.0#");
-        DF4 = new DecimalFormat("0.0###");
-    }
-
-    @Test
-    public void contextLoads() {
-    }
+    private static final int TRANSACTION_MAX_COUNT = 100;
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
 
     @Test
     public void timestampSequentialTransactionLoading() throws InterruptedException {
@@ -62,14 +53,13 @@ public class JavaChallengeApplicationTests {
 
         Random rnd = new Random();
         double sum = 0, max = 0, min = 0;
-        int count = 100;
         if (isDiscrepant) {
             Transaction transactionOutOfBound = new Transaction(1000, System.currentTimeMillis() - 60_000);
             given().contentType(ContentType.JSON).port(port).body(transactionOutOfBound)
                     .when().post("/transactions")
                     .then().statusCode(204);
         }
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < TRANSACTION_MAX_COUNT; i++) {
             double amount = Math.abs((double) rnd.nextInt(100_000) / 100);
             sum += amount;
             max = amount > max ? amount : max;
@@ -81,9 +71,9 @@ public class JavaChallengeApplicationTests {
                     .when().post("/transactions")
                     .then().statusCode(201);
         }
-        double avg = sum / count;
-        log.info("sum={} avg={} max={} min={} count={}", DF2.format(sum), DF4.format(avg), DF2.format(max), DF2.format(min), count);
-        checkStatisticResult(new Statistic(sum, avg, max, min, count));
+        double avg = sum / TRANSACTION_MAX_COUNT;
+        log.info("sum={} avg={} max={} min={} count={}", DECIMAL_FORMAT.format(sum), DECIMAL_FORMAT.format(avg), DECIMAL_FORMAT.format(max), DECIMAL_FORMAT.format(min), TRANSACTION_MAX_COUNT);
+        checkStatisticResult(new Statistic(sum, avg, max, min, TRANSACTION_MAX_COUNT));
     }
 
     private void checkStatisticResult(Statistic stat) {
@@ -94,10 +84,10 @@ public class JavaChallengeApplicationTests {
                 .assertThat().body("count", equalTo((int) stat.getCount()));
 
         String json = given().port(port).get("/statistics").asString();
-        assertThat(DF2.format(stat.getSum()), equalTo(from(json).getString("sum")));
-        assertThat(DF4.format(stat.getAvg()), equalTo(from(json).getString("avg")));
-        assertThat(DF2.format(stat.getMax()), equalTo(from(json).getString("max")));
-        assertThat(DF2.format(stat.getMin()), equalTo(from(json).getString("min")));
+        assertThat(DECIMAL_FORMAT.format(stat.getSum()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("sum"))));
+        assertThat(DECIMAL_FORMAT.format(stat.getAvg()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("avg"))));
+        assertThat(DECIMAL_FORMAT.format(stat.getMax()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("max"))));
+        assertThat(DECIMAL_FORMAT.format(stat.getMin()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("min"))));
     }
 
 }
