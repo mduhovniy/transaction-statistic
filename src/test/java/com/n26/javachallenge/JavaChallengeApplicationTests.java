@@ -35,8 +35,8 @@ public class JavaChallengeApplicationTests {
     private static final DecimalFormat DF2;
 
     static {
-        DF2 = new DecimalFormat("#.##");
-        DF4 = new DecimalFormat("#.####");
+        DF2 = new DecimalFormat("0.0#");
+        DF4 = new DecimalFormat("0.0###");
     }
 
     @Test
@@ -76,7 +76,7 @@ public class JavaChallengeApplicationTests {
             min = i == 0 ? amount : amount < min ? amount : min;
             log.info("Amount={} generated", amount);
             Transaction transaction = new Transaction(amount, System.currentTimeMillis());
-            Thread.sleep(100);
+            Thread.sleep(10);
             given().contentType(ContentType.JSON).port(port).body(transaction)
                     .when().post("/transactions")
                     .then().statusCode(200);
