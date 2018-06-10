@@ -13,9 +13,11 @@ public class TransactionServiceImpl implements TransactionService {
     private final TransactionRepository transactionRepository;
 
     @Override
-    public void addTransaction(Transaction transaction) {
+    public boolean addTransaction(Transaction transaction) {
         if(transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE) {
             transactionRepository.addTransaction(transaction);
+            return true;
         }
+        return false;
     }
 }

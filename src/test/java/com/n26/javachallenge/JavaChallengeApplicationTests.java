@@ -67,7 +67,7 @@ public class JavaChallengeApplicationTests {
             Transaction transactionOutOfBound = new Transaction(1000, System.currentTimeMillis() - 60_000);
             given().contentType(ContentType.JSON).port(port).body(transactionOutOfBound)
                     .when().post("/transactions")
-                    .then().statusCode(200);
+                    .then().statusCode(204);
         }
         for (int i = 0; i < count; i++) {
             double amount = Math.abs((double) rnd.nextInt(100_000) / 100);
@@ -79,7 +79,7 @@ public class JavaChallengeApplicationTests {
             Thread.sleep(10);
             given().contentType(ContentType.JSON).port(port).body(transaction)
                     .when().post("/transactions")
-                    .then().statusCode(200);
+                    .then().statusCode(201);
         }
         double avg = sum / count;
         log.info("sum={} avg={} max={} min={} count={}", DF2.format(sum), DF4.format(avg), DF2.format(max), DF2.format(min), count);
