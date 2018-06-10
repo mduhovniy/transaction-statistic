@@ -12,6 +12,7 @@ public class StatisticExecutorConfig {
 
     @Bean
     public TaskExecutor getTaskExecutor() {
+        // we make our executor single threaded to stop it only once
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);

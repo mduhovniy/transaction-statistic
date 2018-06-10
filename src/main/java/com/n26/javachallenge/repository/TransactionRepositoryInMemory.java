@@ -55,23 +55,29 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
 
     @Override
     public void clearStatistic() throws InterruptedException {
-        log.info("Statistic was cleared");
+        log.info("Statistic started to clear");
         destroy();
+        // we give recalculation some timeout to stop
         Thread.sleep(1_000);
         transactions.clear();
         lastProjection = null;
         init();
+        log.info("Statistic was cleared");
     }
 
     private final class StatisticRecalculation implements Runnable {
 
         @Override
         public void run() {
+            // previous minimum & maximum to restore when new one will expire
+            // we assume that our amount always positive
             double prevMax = 0, prevMin = Double.MAX_VALUE;
+            // buffer for transactions that was processed but not expired
             BlockingQueue<TransactionForQueue> processedTransactionBuffer = new PriorityBlockingQueue<>();
             try {
                 TransactionForQueue transaction = transactions.take();
                 while (!transaction.isProcessingStopped()) {
+                    // first of all we prepare
                     double sum = 0;
                     double avg = 0;
                     double max = 0;
@@ -86,8 +92,10 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
                     }
                     while (transaction.isProcessed() && !transaction.isProcessingStopped()) {
                         if (transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE) {
+                            // transaction was already processed but ton expired
                             processedTransactionBuffer.put(transaction);
                         } else {
+                            // transaction was expired and we should exclude it from result
                             sum -= transaction.getAmount();
                             max = transaction.getAmount() == max ? prevMax : max;
                             min = transaction.getAmount() == min ? prevMin : min;
@@ -96,7 +104,9 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
                         }
                         transaction = transactions.take();
                     }
+                    // transaction not processed before
                     if (transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE) {
+                        // transaction not expired and we should include it to result
                         sum += transaction.getAmount();
                         if (transaction.getAmount() > max) {
                             prevMax = max;
@@ -108,17 +118,23 @@ public class TransactionRepositoryInMemory implements TransactionRepository {
                         }
                         count++;
                         avg = sum / count;
+                        // we return new wrapper to the queue for further exclusion
                         transactions.put(new TransactionForQueue(transaction.getTransaction(), true));
                     }
+                    // if transaction was already expired we do nothing
+                    // we return all transaction from buffer to queue for further processing
                     while (!processedTransactionBuffer.isEmpty()) {
                         transactions.put(processedTransactionBuffer.take());
                     }
+                    // we prepare new result
                     lastProjection = new Statistic(sum, avg, max, min, count);
+                    // and finally we take next transaction into process
                     if (!transaction.isProcessingStopped())
                         transaction = transactions.take();
                 }
             } catch (InterruptedException e) {
-                log.info("StatisticRecalculation was interrupted");
+                Thread.currentThread().interrupt();
+                log.warn("StatisticRecalculation in Thread={} was interrupted", Thread.currentThread().getName());
             }
         }
     }

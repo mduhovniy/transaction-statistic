@@ -5,6 +5,9 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.ToString;
 
+/**
+ * Wrapper value object for Transaction to use it in transaction processing
+ */
 @ToString
 @EqualsAndHashCode
 @Getter
@@ -19,6 +22,7 @@ public class TransactionForQueue implements Comparable<TransactionForQueue> {
     @NonNull
     private final boolean processingStopped;
 
+    // we use this default constructor to make stopper for processing
     public TransactionForQueue() {
         processed = false;
         amount = 0;
@@ -37,6 +41,7 @@ public class TransactionForQueue implements Comparable<TransactionForQueue> {
         return new Transaction(amount, timestamp);
     }
 
+    // sorting order of our objects is ASC
     @Override
     public int compareTo(TransactionForQueue another) {
         if (timestamp == another.timestamp) return 0;

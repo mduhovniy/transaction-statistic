@@ -14,6 +14,7 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     public boolean addTransaction(Transaction transaction) {
+        // we assume that our amount always positive and ignore expired transactions
         if (transaction.getTimestamp() > System.currentTimeMillis() - ONE_MINUTE && transaction.getAmount() >= 0) {
             transactionRepository.addTransaction(transaction);
             return true;
