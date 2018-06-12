@@ -27,51 +27,63 @@ public class JavaChallengeApplicationTests {
 
     @LocalServerPort
     private int port;
-
     @Autowired
     private TransactionProcessor transactionProcessor;
 
+    // we use reasonable count to make all posts in 1 minute
     private static final int TRANSACTION_MAX_COUNT = 1000;
-    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.0");
+    // for big number of transactions we use rounding to integer representation
+    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.");
 
     @Test
     public void timestampSequentialTransactionLoading() throws InterruptedException {
         transactionProcessor.clearStatistic();
-        transactionLoading(false);
+        transactionLoading(0);
     }
 
     @Test
     public void timestampDiscrepancyTransactionLoading() throws InterruptedException {
         transactionProcessor.clearStatistic();
-        transactionLoading(true);
+        Random rnd = new Random();
+        // we use random lag for every < 10 sec
+        transactionLoading((long) rnd.nextInt(10_000));
     }
 
-    private void transactionLoading(boolean isDiscrepant) throws InterruptedException {
+    private void transactionLoading(long lagInMs) throws InterruptedException {
+        // first we check transactionProcessor restart
         given().port(port)
                 .when().get("/statistics")
                 .then().assertThat().body("count", equalTo(0));
-
+        // than we check expired transaction filter
+        Transaction expiredTransaction = new Transaction(1000, System.currentTimeMillis() - 60_000);
+        given().contentType(ContentType.JSON).port(port).body(expiredTransaction)
+                .when().post("/transactions")
+                .then().statusCode(204);
+        // than we send transaction that goes out of boundaries when bulk is running
+        Transaction transactionGoesOutOfBound = new Transaction(1000, System.currentTimeMillis() - 59_000);
+        given().contentType(ContentType.JSON).port(port).body(transactionGoesOutOfBound)
+                .when().post("/transactions")
+                .then().statusCode(201);
+        // than we send bulk posts
         Random rnd = new Random();
         double sum = 0, max = 0, min = 0;
-        if (isDiscrepant) {
-            Transaction transactionOutOfBound = new Transaction(1000, System.currentTimeMillis() - 60_000);
-            given().contentType(ContentType.JSON).port(port).body(transactionOutOfBound)
-                    .when().post("/transactions")
-                    .then().statusCode(204);
-        }
         for (int i = 0; i < TRANSACTION_MAX_COUNT; i++) {
             double amount = Math.abs((double) rnd.nextInt(100_000) / 100);
             sum += amount;
             max = amount > max ? amount : max;
             min = i == 0 ? amount : amount < min ? amount : min;
             log.info("Amount={} generated", amount);
-            Transaction transaction = new Transaction(amount, System.currentTimeMillis());
+            long timestamp = System.currentTimeMillis();
+            // if we have lag than we emulate delay in timeStamp for every second transaction
+            if (i % 2 == 0 && lagInMs != 0) timestamp -= lagInMs;
+            Transaction transaction = new Transaction(amount, timestamp);
             Thread.sleep(10);
             given().contentType(ContentType.JSON).port(port).body(transaction)
                     .when().post("/transactions")
                     .then().statusCode(201);
         }
         double avg = sum / TRANSACTION_MAX_COUNT;
+        // and finally we check the result
         log.info("sum={} avg={} max={} min={} count={}", DECIMAL_FORMAT.format(sum), DECIMAL_FORMAT.format(avg), DECIMAL_FORMAT.format(max), DECIMAL_FORMAT.format(min), TRANSACTION_MAX_COUNT);
         checkStatisticResult(new Statistic(sum, avg, max, min, TRANSACTION_MAX_COUNT));
     }
@@ -84,10 +96,18 @@ public class JavaChallengeApplicationTests {
                 .assertThat().body("count", equalTo((int) stat.getCount()));
 
         String json = given().port(port).get("/statistics").asString();
-        assertThat(DECIMAL_FORMAT.format(stat.getSum()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("sum"))));
-        assertThat(DECIMAL_FORMAT.format(stat.getAvg()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("avg"))));
-        assertThat(DECIMAL_FORMAT.format(stat.getMax()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("max"))));
-        assertThat(DECIMAL_FORMAT.format(stat.getMin()), equalTo(DECIMAL_FORMAT.format(from(json).getDouble("min"))));
+        double sum = from(json).getDouble("sum");
+        double avg = from(json).getDouble("avg");
+        double max = from(json).getDouble("max");
+        double min = from(json).getDouble("min");
+        assertThat(DECIMAL_FORMAT.format(stat.getSum()), equalTo(DECIMAL_FORMAT.format(sum)));
+        assertThat(DECIMAL_FORMAT.format(stat.getAvg()), equalTo(DECIMAL_FORMAT.format(avg)));
+        assertThat(DECIMAL_FORMAT.format(stat.getMax()), equalTo(DECIMAL_FORMAT.format(max)));
+        assertThat(DECIMAL_FORMAT.format(stat.getMin()), equalTo(DECIMAL_FORMAT.format(min)));
+        log.info("Divergence of SUM={}", sum - stat.getSum());
+        log.info("Divergence of AVG={}", avg - stat.getAvg());
+        log.info("Divergence of MAX={}", max - stat.getMax());
+        log.info("Divergence of MIN={}", min - stat.getMin());
     }
 
 }
